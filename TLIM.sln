@@ -2,6 +2,8 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TLIM Console Debuger", "TLIM Console Debuger\TLIM Console Debuger.csproj", "{34E6FDC1-3912-43BB-BE2F-EEBB7A82B987}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TLIM Core", "TLIM Core\TLIM Core.csproj", "{6F32BFBF-23C4-4199-9CDD-AF3EB7B7E7B5}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -12,5 +14,9 @@ Global
 		{34E6FDC1-3912-43BB-BE2F-EEBB7A82B987}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{34E6FDC1-3912-43BB-BE2F-EEBB7A82B987}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{34E6FDC1-3912-43BB-BE2F-EEBB7A82B987}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6F32BFBF-23C4-4199-9CDD-AF3EB7B7E7B5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6F32BFBF-23C4-4199-9CDD-AF3EB7B7E7B5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6F32BFBF-23C4-4199-9CDD-AF3EB7B7E7B5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6F32BFBF-23C4-4199-9CDD-AF3EB7B7E7B5}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
