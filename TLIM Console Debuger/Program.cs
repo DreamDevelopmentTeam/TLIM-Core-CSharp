@@ -67,3 +67,9 @@ MCPClient client = new MCPClient(imClientData, new IPEndPoint(IPAddress.Parse("1
         )
     );
 }*/
+Thread.Sleep(5000);
+Console.WriteLine(
+    client.SendMessage(
+        JsonObject.Parse("{\"test\": 114514}").AsObject()
+    )
+);
