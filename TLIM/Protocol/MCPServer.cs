@@ -1,5 +1,6 @@
 ﻿using System.Net;
 using System.Net.Sockets;
+using System.Text.Json.Nodes;
 using TLIM.Core;
 
 namespace TLIM.Protocol;
@@ -40,6 +41,7 @@ public class MCPServer
 
     private void PackageHandlerThread(TcpListener socket)
     {
+        socket.Start();
         while (true)
         {
             try
@@ -53,6 +55,7 @@ public class MCPServer
             }
         }
     }
+    
     
     
 }

@@ -9,4 +9,12 @@ public class DebugUtils
             Console.WriteLine("[DEBUG] " + msg);
         }
     }
+    
+    public static void DeepDebugOut(string msg)
+    {
+        if (ConstValues.DeepDebugMode)
+        {
+            Console.WriteLine("[DPBUG] " + msg);
+        }
+    }
 }

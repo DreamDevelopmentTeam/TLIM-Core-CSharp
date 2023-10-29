@@ -2,15 +2,14 @@
 using System.Net.Sockets;
 using System.Text;
 using System.Text.Json.Nodes;
-using TLIM.Core;
 using TLIM.Protocol.Messages;
 
 namespace TLIM.Protocol;
 
-public class MCPServerAcceptHandler
+public class MCPClientAcceptHandler
 {
     private TcpClient _client;
-    private IMServerData _imServerData;
+    private IMClientData _imClientData;
     private int packageCount = 0;
     
     private bool helloReceived = false;
@@ -18,14 +17,17 @@ public class MCPServerAcceptHandler
     private bool authReceived = false;
     private bool encryptionEnabled = false;
     
-    
+    private Random ran = new Random();
+    private int keyTestCode;
 
-    private ClientHelloMessage clientInfo;
+    private ServerHelloMessage serverInfo;
 
-    public MCPServerAcceptHandler(TcpClient client, IMServerData imServerData)
+    public MCPClientAcceptHandler(TcpClient client, IMClientData imClientData)
     {
         this._client = client;
-        this._imServerData = imServerData;
+        this._imClientData = imClientData;
+
+        this.keyTestCode = ran.Next(0, 33554432);
 
         StartThreads();
     }
@@ -34,6 +36,13 @@ public class MCPServerAcceptHandler
     {
         Thread thread = new Thread(() =>
         {
+            ClientHelloMessage clientHelloMessage = new ClientHelloMessage();
+            clientHelloMessage.ver = this._imClientData.VersionCode;
+            clientHelloMessage.mac = MacUtils.GetMachineCodePlus();
+            clientHelloMessage.key = this._imClientData.ClientPublicKey;
+            this._client.Client.Send(Encoding.UTF8.GetBytes(clientHelloMessage.ToJsonString()));
+            
+            DebugUtils.DeepDebugOut("Server.SAH.Thread : Send Data : " + clientHelloMessage.ToJsonString());
             DataHandlerThread(this._client.Client);
         });
         
@@ -59,80 +68,58 @@ public class MCPServerAcceptHandler
                 byte[] buffer = new byte[65535];
                 int len = socket.ReceiveFrom(buffer, ref endPoint);
                 IPEndPoint ip = (IPEndPoint)endPoint;
-
-                DebugUtils.DeepDebugOut("Server.SAH.Thread(" + ip.Address.ToString() + ") : Get Data : " + len.ToString());
                 
-                if (this._imServerData.IpBlackList.Contains(ip.Address.ToString()))
-                {
-                    this._client.Close();
-                    DebugUtils.DebugOut("Server.SAH.Thread(" + ip.Address.ToString() + ") : IP BlackListed");
-                    return;
-                }
-                if (this._imServerData.IpBlackListRegex.Count != 0)
-                {
-                    foreach (var regex in this._imServerData.IpBlackListRegex)
-                    {
-                        if (regex.IsMatch(ip.Address.ToString()))
-                        {
-                            this._client.Close();
-                            DebugUtils.DebugOut("Server.SAH.Thread(" + ip.Address.ToString() + ") : IP Regex BlackListed");
-                            return;
-                        }
-                    }
-                }
+                DebugUtils.DeepDebugOut("Client.SAH.Thread(" + ip.Address.ToString() + ") : Get Data : " + len.ToString());
                 
                 string temp = Encoding.UTF8.GetString(buffer);
                 
                 if (!this.helloReceived && this.packageCount == 0)
                 {
                     // New Connect
-                    this.clientInfo = ClientHelloMessage.FromJsonString<ClientHelloMessage>(temp);
+                    this.serverInfo = ServerHelloMessage.FromJsonString<ServerHelloMessage>(temp);
+
+                    KeyTestMessage keyTestMessage = new KeyTestMessage();
+                    keyTestMessage.code = this.keyTestCode;
                     
-                    if (this._imServerData.MacBlackList.Contains(this.clientInfo.mac))
-                    {
-                        this._client.Close();
-                        DebugUtils.DebugOut("Server.SAH.Thread(" + ip.Address.ToString() + ") : Mac BlackListed");
-                        return;
-                    }
-                    
-                    ServerHelloMessage serverHelloMessage = new ServerHelloMessage();
-                    serverHelloMessage.ver = this._imServerData.VersionCode;
-                    serverHelloMessage.name = this._imServerData.ServerName;
-                    serverHelloMessage.desc = this._imServerData.ServerDescribe;
-                    serverHelloMessage.key = this._imServerData.ServerPublicKey;
-                    socket.Send(Encoding.UTF8.GetBytes(serverHelloMessage.ToJsonString()));
+                    socket.Send(keyTestMessage.ToJsonStringEncrypted(this.serverInfo.key));
                     this.helloReceived = true;
                     continue;
                 }
                 if (!this.testReceived && this.packageCount == 1)
                 {
-                    KeyTestMessage keyTestMessage = KeyTestMessage.FromJsonStringEncrypted(buffer, this._imServerData.ServerPrivateKey);
-                    DebugUtils.DebugOut("Server.SAH.Thread(" + ip.Address.ToString() + ") : Key Test Code = " + keyTestMessage.code.ToString());
-                    socket.Send(keyTestMessage.ToJsonStringEncrypted(this.clientInfo.key));
+                    KeyTestMessage keyTestMessage = KeyTestMessage.FromJsonStringEncrypted(buffer, this._imClientData.ClientPrivateKey);
+                    DebugUtils.DebugOut("Client.SAH.Thread(" + ip.Address.ToString() + ") : Key Test Code = " + keyTestMessage.code.ToString());
+
+                    if (keyTestMessage.code != this.keyTestCode)
+                    {
+                        this._client.Close();
+                        DebugUtils.DebugOut("Client.SAH.Thread(" + ip.Address.ToString() + ") : Key Test Code -> Close");
+                        return;
+                    }
+                    
                     this.testReceived = true;
                     this.encryptionEnabled = true;
                     continue;
                 }
                 
                 
-                
+                string jsonString = Encoding.UTF8.GetString(
+                        RSAUtils.DecryptData(this._imClientData.ClientPrivateKey, buffer)
+                    );
                 try
                 {
-                    string jsonString = Encoding.UTF8.GetString(
-                        RSAUtils.DecryptData(this._imServerData.ServerPrivateKey, buffer)
-                    );
                     JsonObject jsonObject = JsonObject.Parse(jsonString).AsObject();
                     if (ProtocolMessageHandler(jsonObject))
                     {
                         this._client.Close();
-                        DebugUtils.DebugOut("Server.SAH.Thread(" + ip.Address.ToString() + ") : Message Handler -> Close");
+                        DebugUtils.DebugOut("Client.SAH.Thread(" + ip.Address.ToString() + ") : Message Handler -> Close");
                         return;
                     }
                 }catch (Exception ex)
                 {
                     try
                     {
-                        DebugUtils.DebugOut("Server.SAH.Thread(" + this._client.Client.RemoteEndPoint.ToString() +
+                        DebugUtils.DebugOut("Client.SAH.Thread(" + this._client.Client.RemoteEndPoint.ToString() +
                                             ") : Data Exception : \n" + ex.ToString());
                     }
                     catch (Exception iex)
@@ -151,7 +138,7 @@ public class MCPServerAcceptHandler
                 try
                 {
                     this._client.Close();
-                    DebugUtils.DebugOut("Server.SAH.Thread(" + this._client.Client.RemoteEndPoint.ToString() +
+                    DebugUtils.DebugOut("Client.SAH.Thread(" + this._client.Client.RemoteEndPoint.ToString() +
                                         ") : \n" + ex.ToString());
                 }
                 catch (Exception iex)
@@ -170,13 +157,13 @@ public class MCPServerAcceptHandler
 
     public bool ProtocolMessageHandler(JsonObject jsonData)
     {
-        Console.WriteLine("C->S: " + jsonData.ToString());
+        Console.WriteLine("S->C: " + jsonData.ToString());
 
 
         return false;
     }
-    
-    
+
+
     public bool SendMessage(JsonObject jsonData)
     {
         if (!this.encryptionEnabled)
@@ -188,7 +175,7 @@ public class MCPServerAcceptHandler
         {
             this._client.Client.Send(
                 RSAUtils.EncryptData(
-                    this.clientInfo.key,
+                    this.serverInfo.key,
                     Encoding.UTF8.GetBytes(
                         jsonData.ToString()
                     )
@@ -198,12 +185,11 @@ public class MCPServerAcceptHandler
         }
         catch (Exception ex)
         {
-            DebugUtils.DebugOut("Server.SAH.Send(" + this._client.Client.RemoteEndPoint.ToString() +
+            DebugUtils.DebugOut("Client.SAH.Send(" + this._client.Client.RemoteEndPoint.ToString() +
                                 ") : \n" + ex.ToString());
             return false;
         }
 
         return false;
     }
-    
 }
