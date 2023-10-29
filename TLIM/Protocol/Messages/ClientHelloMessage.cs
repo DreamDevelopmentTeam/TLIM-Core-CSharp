@@ -1,6 +1,4 @@
-﻿using System.Text.Json.Nodes;
-using Newtonsoft.Json;
-using JsonSerializer = System.Text.Json.JsonSerializer;
+﻿using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace TLIM.Protocol.Messages;
 
@@ -19,9 +17,9 @@ public class ClientHelloMessage : IMessage
         return jsonString;
     }
 
-    public static ClientHelloMessage FromJsonString<ClientHelloMessage>(string jsonString)
+    public static T FromJsonString<T>(string jsonString)
     {
-        ClientHelloMessage newObject = JsonSerializer.Deserialize<ClientHelloMessage>(jsonString);
+        T newObject = JsonSerializer.Deserialize<T>(jsonString);
         return newObject;
     }
 }

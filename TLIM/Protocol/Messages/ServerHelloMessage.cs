@@ -20,9 +20,9 @@ public class ServerHelloMessage : IMessage
         return jsonString;
     }
 
-    public static ServerHelloMessage FromJsonString<ServerHelloMessage>(string jsonString)
+    public static T FromJsonString<T>(string jsonString)
     {
-        ServerHelloMessage newObject = JsonSerializer.Deserialize<ServerHelloMessage>(jsonString);
+        T newObject = JsonSerializer.Deserialize<T>(jsonString);
         return newObject;
     }
 }

@@ -12,11 +12,12 @@ public class MCPClient
 
     private MCPClientAcceptHandler mcpClientAcceptHandler;
     private IPEndPoint serverAddress;
+    
     public MCPClient(IMClientData clientData, IPEndPoint remoteAddress)
     {
         this._imClientData = clientData;
         this.serverAddress = remoteAddress;
-        this._tcpClient = new TcpClient(remoteAddress);
+        this._tcpClient = new TcpClient();
         
         StartHandlerThreads();
     }

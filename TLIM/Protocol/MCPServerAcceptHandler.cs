@@ -1,5 +1,6 @@
 ﻿using System.Net;
 using System.Net.Sockets;
+using System.Reflection;
 using System.Text;
 using System.Text.Json.Nodes;
 using TLIM.Core;
@@ -56,7 +57,12 @@ public class MCPServerAcceptHandler
                     endPoint = new IPEndPoint(IPAddress.Any, 0);
                 }
             
-                byte[] buffer = new byte[65535];
+                byte[] lengthPrefixBuffer = new byte[4];
+                socket.Receive(lengthPrefixBuffer, 0, 4, SocketFlags.None);
+                int messageLength = BitConverter.ToInt32(lengthPrefixBuffer, 0);
+                
+                
+                byte[] buffer = new byte[messageLength];
                 int len = socket.ReceiveFrom(buffer, ref endPoint);
                 IPEndPoint ip = (IPEndPoint)endPoint;
 
@@ -81,13 +87,23 @@ public class MCPServerAcceptHandler
                     }
                 }
                 
-                string temp = Encoding.UTF8.GetString(buffer);
+                // string temp = Encoding.UTF8.GetString(buffer);
+                try
+                {
+                    string data = Encoding.UTF8.GetString(buffer);
+                    DebugUtils.DeepDebugOut($"Server.SAH.Thread(" + ip.Address.ToString() + $") [{this.packageCount}] : Get Data Package : " + data);
+                }
+                catch (Exception ex)
+                {
+                    DebugUtils.DeepDebugOut("Server.SAH.Thread(" + ip.Address.ToString() + ") : Get Data Package : [Bin Data]");
+                }
                 
                 if (!this.helloReceived && this.packageCount == 0)
                 {
                     // New Connect
-                    this.clientInfo = ClientHelloMessage.FromJsonString<ClientHelloMessage>(temp);
-                    
+                    string temp = Encoding.UTF8.GetString(buffer);
+                    this.clientInfo = ClientHelloMessage.FromJsonString<ClientHelloMessage>(temp); // .Replace("\0", "")
+                    DebugUtils.DeepDebugOut("Server.SAH.Thread(" + ip.Address.ToString() + ") : Get Client Hello : " + this.clientInfo.ToJsonString());
                     if (this._imServerData.MacBlackList.Contains(this.clientInfo.mac))
                     {
                         this._client.Close();
@@ -100,17 +116,22 @@ public class MCPServerAcceptHandler
                     serverHelloMessage.name = this._imServerData.ServerName;
                     serverHelloMessage.desc = this._imServerData.ServerDescribe;
                     serverHelloMessage.key = this._imServerData.ServerPublicKey;
-                    socket.Send(Encoding.UTF8.GetBytes(serverHelloMessage.ToJsonString()));
+                    SendRawMessage(Encoding.UTF8.GetBytes(serverHelloMessage.ToJsonString()));
+                    DebugUtils.DeepDebugOut("Server.SAH.Thread(" + ip.Address.ToString() + ") : Send Server Hello");
                     this.helloReceived = true;
+                    this.packageCount++;
                     continue;
                 }
                 if (!this.testReceived && this.packageCount == 1)
                 {
+                    DebugUtils.DeepDebugOut("Server.SAH.Thread(Unknown) : Get Client Key Test");
                     KeyTestMessage keyTestMessage = KeyTestMessage.FromJsonStringEncrypted(buffer, this._imServerData.ServerPrivateKey);
                     DebugUtils.DebugOut("Server.SAH.Thread(" + ip.Address.ToString() + ") : Key Test Code = " + keyTestMessage.code.ToString());
-                    socket.Send(keyTestMessage.ToJsonStringEncrypted(this.clientInfo.key));
+                    SendRawMessage(keyTestMessage.ToJsonStringEncrypted(this.clientInfo.key));
                     this.testReceived = true;
                     this.encryptionEnabled = true;
+                    DebugUtils.DeepDebugOut("Server.SAH.Thread(Unknown) : Send Server Key Test");
+                    this.packageCount++;
                     continue;
                 }
                 
@@ -137,7 +158,7 @@ public class MCPServerAcceptHandler
                     }
                     catch (Exception iex)
                     {
-                    
+                        DebugUtils.DebugOut("Server.SAH.Thread(Unknown) : Data Exception : \n" + ex.ToString());
                     }
                     
                 }
@@ -156,7 +177,7 @@ public class MCPServerAcceptHandler
                 }
                 catch (Exception iex)
                 {
-                    
+                    DebugUtils.DebugOut("Server.SAH.Thread(Unknown) : Data Exception : \n" + ex.ToString());
                 }
 
                 return;
@@ -186,7 +207,7 @@ public class MCPServerAcceptHandler
 
         try
         {
-            this._client.Client.Send(
+            SendRawMessage(
                 RSAUtils.EncryptData(
                     this.clientInfo.key,
                     Encoding.UTF8.GetBytes(
@@ -204,6 +225,18 @@ public class MCPServerAcceptHandler
         }
 
         return false;
+    }
+
+
+    private void SendRawMessage(byte[] data, Socket socket = null)
+    {
+        byte[] message = data;
+        byte[] lengthPrefix = BitConverter.GetBytes(message.Length);
+        if (socket == null)
+        {
+            socket = this._client.Client;
+        }
+        socket.Send(lengthPrefix.Concat(message).ToArray());
     }
     
 }

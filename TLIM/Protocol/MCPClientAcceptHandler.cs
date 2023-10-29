@@ -40,9 +40,9 @@ public class MCPClientAcceptHandler
             clientHelloMessage.ver = this._imClientData.VersionCode;
             clientHelloMessage.mac = MacUtils.GetMachineCodePlus();
             clientHelloMessage.key = this._imClientData.ClientPublicKey;
-            this._client.Client.Send(Encoding.UTF8.GetBytes(clientHelloMessage.ToJsonString()));
+            SendRawMessage(Encoding.UTF8.GetBytes(clientHelloMessage.ToJsonString()));
             
-            DebugUtils.DeepDebugOut("Server.SAH.Thread : Send Data : " + clientHelloMessage.ToJsonString());
+            DebugUtils.DeepDebugOut("Client.SAH.Thread : Send Client Hello : " + clientHelloMessage.ToJsonString());
             DataHandlerThread(this._client.Client);
         });
         
@@ -64,29 +64,48 @@ public class MCPClientAcceptHandler
                 {
                     endPoint = new IPEndPoint(IPAddress.Any, 0);
                 }
-            
-                byte[] buffer = new byte[65535];
+                
+                
+                byte[] lengthPrefixBuffer = new byte[4];
+                socket.Receive(lengthPrefixBuffer, 0, 4, SocketFlags.None);
+                int messageLength = BitConverter.ToInt32(lengthPrefixBuffer, 0);
+                
+                byte[] buffer = new byte[messageLength];
                 int len = socket.ReceiveFrom(buffer, ref endPoint);
                 IPEndPoint ip = (IPEndPoint)endPoint;
                 
                 DebugUtils.DeepDebugOut("Client.SAH.Thread(" + ip.Address.ToString() + ") : Get Data : " + len.ToString());
                 
-                string temp = Encoding.UTF8.GetString(buffer);
+                // string temp = Encoding.UTF8.GetString(buffer);
+                try
+                {
+                    string data = Encoding.UTF8.GetString(buffer);
+                    DebugUtils.DeepDebugOut("Client.SAH.Thread(" + ip.Address.ToString() + $") [{this.packageCount}] : Get Data Package : " + data);
+                }
+                catch (Exception ex)
+                {
+                    DebugUtils.DeepDebugOut("Client.SAH.Thread(" + ip.Address.ToString() + ") : Get Data Package : [Bin Data]");
+                }
                 
                 if (!this.helloReceived && this.packageCount == 0)
                 {
                     // New Connect
-                    this.serverInfo = ServerHelloMessage.FromJsonString<ServerHelloMessage>(temp);
-
+                    string temp = Encoding.UTF8.GetString(buffer);
+                    this.serverInfo = ServerHelloMessage.FromJsonString<ServerHelloMessage>(temp); // .Replace("\0", "")
+                    DebugUtils.DeepDebugOut("Client.SAH.Thread(Unknown) : Get Server Hello : " + this.serverInfo.ToJsonString());
+                    
                     KeyTestMessage keyTestMessage = new KeyTestMessage();
                     keyTestMessage.code = this.keyTestCode;
                     
-                    socket.Send(keyTestMessage.ToJsonStringEncrypted(this.serverInfo.key));
+                    SendRawMessage(keyTestMessage.ToJsonStringEncrypted(this.serverInfo.key));
                     this.helloReceived = true;
+                    DebugUtils.DeepDebugOut("Client.SAH.Thread(Unknown) : Send Client Key Test");
+                    this.packageCount++;
                     continue;
                 }
                 if (!this.testReceived && this.packageCount == 1)
                 {
+                    DebugUtils.DeepDebugOut("Client.SAH.Thread(Unknown) : Get Server Key Test");
                     KeyTestMessage keyTestMessage = KeyTestMessage.FromJsonStringEncrypted(buffer, this._imClientData.ClientPrivateKey);
                     DebugUtils.DebugOut("Client.SAH.Thread(" + ip.Address.ToString() + ") : Key Test Code = " + keyTestMessage.code.ToString());
 
@@ -99,6 +118,7 @@ public class MCPClientAcceptHandler
                     
                     this.testReceived = true;
                     this.encryptionEnabled = true;
+                    this.packageCount++;
                     continue;
                 }
                 
@@ -124,7 +144,7 @@ public class MCPClientAcceptHandler
                     }
                     catch (Exception iex)
                     {
-                    
+                        DebugUtils.DebugOut("Client.SAH.Thread(Unknown) : Data Exception : \n" + ex.ToString());
                     }
                     
                 }
@@ -143,7 +163,7 @@ public class MCPClientAcceptHandler
                 }
                 catch (Exception iex)
                 {
-                    
+                    DebugUtils.DebugOut("Client.SAH.Thread(Unknown) : Data Exception : \n" + ex.ToString());
                 }
 
                 return;
@@ -173,7 +193,7 @@ public class MCPClientAcceptHandler
 
         try
         {
-            this._client.Client.Send(
+            SendRawMessage(
                 RSAUtils.EncryptData(
                     this.serverInfo.key,
                     Encoding.UTF8.GetBytes(
@@ -191,5 +211,16 @@ public class MCPClientAcceptHandler
         }
 
         return false;
+    }
+    
+    private void SendRawMessage(byte[] data, Socket socket = null)
+    {
+        byte[] message = data;
+        byte[] lengthPrefix = BitConverter.GetBytes(message.Length);
+        if (socket == null)
+        {
+            socket = this._client.Client;
+        }
+        socket.Send(lengthPrefix.Concat(message).ToArray());
     }
 }
