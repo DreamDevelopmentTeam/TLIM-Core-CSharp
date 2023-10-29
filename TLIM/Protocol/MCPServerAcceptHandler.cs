@@ -10,11 +10,14 @@ public class MCPServerAcceptHandler
 {
     private TcpClient _client;
     private IMServerData _imServerData;
+    private int packageCount = 0;
     
     private bool helloReceived = false;
     private bool testReceived = false;
     private bool authReceived = false;
-    private int packageCount = 0;
+    private bool encryptionEnabled = false;
+    
+    
 
     private ClientHelloMessage clientInfo;
 
