@@ -8,11 +8,21 @@ using System.Text;
 public class RSAUtils
 {
     // Generate an RSA key pair and return the public key in XML format
-    public static string GenerateRSAKeyPair()
+    /*public static string GenerateRSAKeyPair()
     {
         using (var rsa = new RSACryptoServiceProvider())
         {
             return rsa.ToXmlString(true);
+        }
+    }*/
+    
+    public static string[] GenerateRSAKeyPair()
+    {
+        using (var rsa = new RSACryptoServiceProvider())
+        {
+            string publicKey = rsa.ToXmlString(false); // Include only the public key
+            string privateKey = rsa.ToXmlString(true); // Include both public and private keys
+            return new string[] { publicKey, privateKey };
         }
     }
 
