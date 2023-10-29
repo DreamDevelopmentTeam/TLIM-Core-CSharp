@@ -2,9 +2,15 @@
 
 using System.Net;
 using System.Text.Json.Nodes;
+using TLIM;
 using TLIM.Protocol;
 
 Console.WriteLine("Hello, World!");
+
+/*string[] keys = RSAUtils.GenerateRSAKeyPair();
+Console.WriteLine(keys[0]);
+Console.WriteLine(keys[1]);
+return;*/
 
 FindServerProtocol fcpServer = new FindServerProtocol(11451);
 FindServerProtocol fcpServer2 = new FindServerProtocol(11452);
@@ -21,6 +27,7 @@ IMServerData imServerData = new IMServerData();
 MCPServer mcpServer = new MCPServer(imServerData, 11451);
 
 IMClientData imClientData = new IMClientData();
+
 MCPClient client = new MCPClient(imClientData, new IPEndPoint(IPAddress.Parse("127.0.0.1"), 11451));
 
 client.SendMessage(
