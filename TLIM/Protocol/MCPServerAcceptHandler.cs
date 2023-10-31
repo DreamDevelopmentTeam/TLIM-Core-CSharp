@@ -23,10 +23,13 @@ public class MCPServerAcceptHandler
 
     private ClientHelloMessage clientInfo;
 
+    private IMServerDataHandler imServerDataHandler;
+
     public MCPServerAcceptHandler(TcpClient client, IMServerData imServerData)
     {
         this._client = client;
         this._imServerData = imServerData;
+        this.imServerDataHandler = new IMServerDataHandler(this._imServerData);
 
         StartThreads();
     }
@@ -192,9 +195,10 @@ public class MCPServerAcceptHandler
     public bool ProtocolMessageHandler(JsonObject jsonData)
     {
         Console.WriteLine("C->S: " + jsonData.ToString());
+        return this.imServerDataHandler.ProtocolMessageHandler(this, jsonData);
 
 
-        return false;
+        // return false;
     }
     
     
