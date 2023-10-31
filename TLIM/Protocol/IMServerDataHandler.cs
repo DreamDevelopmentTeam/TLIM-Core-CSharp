@@ -10,7 +10,6 @@ public class IMServerDataHandler
     {
         this._imServerData = imServerData;
         
-        
     }    
     
     public bool ProtocolMessageHandler(MCPServerAcceptHandler sah, JsonObject jsonData)

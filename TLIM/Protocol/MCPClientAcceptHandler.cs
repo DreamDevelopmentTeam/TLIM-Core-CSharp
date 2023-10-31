@@ -22,13 +22,17 @@ public class MCPClientAcceptHandler
 
     private ServerHelloMessage serverInfo;
 
+    private IMClientDataHandler imClientDataHandler;
+
     public MCPClientAcceptHandler(TcpClient client, IMClientData imClientData)
     {
         this._client = client;
         this._imClientData = imClientData;
 
         this.keyTestCode = ran.Next(0, 33554432);
-
+        
+        this.imClientDataHandler = new IMClientDataHandler(this._imClientData);
+        
         StartThreads();
     }
 
@@ -178,7 +182,7 @@ public class MCPClientAcceptHandler
     public bool ProtocolMessageHandler(JsonObject jsonData)
     {
         Console.WriteLine("S->C: " + jsonData.ToString());
-
+        this.imClientDataHandler.ProtocolMessageHandler(this, jsonData);
 
         return false;
     }
